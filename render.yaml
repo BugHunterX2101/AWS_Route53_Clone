@@ -24,17 +24,21 @@ services:
     name: route53-clone-frontend
     runtime: node
     rootDir: frontend
-    buildCommand: npm install && npm run build
+    # Use npm ci for reproducible installs (respects package-lock.json exactly)
+    buildCommand: npm ci && npm run build
     startCommand: npm start
     plan: free
     envVars:
       - key: NODE_VERSION
         value: 20.0.0
-      # Limit Node memory to stay within Render free tier 512MB RAM limit.
-      # Without this the next build step can get OOM-killed silently.
+      # Disable Next.js telemetry network calls during build
+      - key: NEXT_TELEMETRY_DISABLED
+        value: 1
+      # Cap Node heap to stay inside Render free tier 512MB RAM.
+      # ESLint + TypeScript checks are disabled in next.config.js so 460MB is safe.
       - key: NODE_OPTIONS
-        value: --max-old-space-size=400
-      # Resolved automatically to https://<backend>.onrender.com at deploy time.
+        value: --max-old-space-size=460
+      # Resolved at deploy time to https://<backend>.onrender.com
       - key: BACKEND_URL
         fromService:
           name: route53-clone-backend
