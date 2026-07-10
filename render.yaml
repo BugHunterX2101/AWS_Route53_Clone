@@ -1,4 +1,5 @@
 services:
+  # ── Backend: FastAPI ────────────────────────────────────────────
   - type: web
     name: route53-clone-backend
     runtime: python
@@ -18,6 +19,7 @@ services:
       - key: CORS_ALLOW_ALL
         value: true
 
+  # ── Frontend: Next.js ───────────────────────────────────────────
   - type: web
     name: route53-clone-frontend
     runtime: node
@@ -28,6 +30,11 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20.0.0
+      # Limit Node memory to stay within Render free tier 512MB RAM limit.
+      # Without this the next build step can get OOM-killed silently.
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=400
+      # Resolved automatically to https://<backend>.onrender.com at deploy time.
       - key: BACKEND_URL
         fromService:
           name: route53-clone-backend
