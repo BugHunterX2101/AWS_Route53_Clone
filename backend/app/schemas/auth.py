@@ -19,4 +19,5 @@ class UserResponse(BaseModel):
 
 class LoginResponse(BaseModel):
     user: UserResponse
+    token: str
     message: str = "Login successful"

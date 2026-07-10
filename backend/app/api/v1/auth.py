@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Response, Cookie
+from fastapi import APIRouter, Depends, Response, Cookie, Header
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -15,6 +15,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 def login(req: LoginRequest, response: Response, db: Session = Depends(get_db)):
     svc = AuthService(db)
     user, token = svc.login(req)
+
+    # Always return token in the response body so the frontend can store it.
+    # Also set an HTTP-only cookie for backward compatibility with direct access.
     response.set_cookie(
         key="session_id",
         value=token,
@@ -22,17 +25,27 @@ def login(req: LoginRequest, response: Response, db: Session = Depends(get_db)):
         samesite="lax",
         max_age=86400,
     )
-    return LoginResponse(user=UserResponse.model_validate(user))
+    return LoginResponse(
+        user=UserResponse.model_validate(user),
+        token=token,
+    )
 
 
 @router.post("/logout")
 def logout(
     response: Response,
+    authorization: Optional[str] = Header(default=None),
     session_id: Optional[str] = Cookie(default=None),
     db: Session = Depends(get_db),
 ):
-    if session_id:
-        AuthService(db).logout(session_id)
+    token = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+    elif session_id:
+        token = session_id
+
+    if token:
+        AuthService(db).logout(token)
     response.delete_cookie("session_id")
     return {"message": "Logged out successfully"}
 

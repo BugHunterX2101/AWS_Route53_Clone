@@ -1,7 +1,7 @@
 "use client";
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { User } from "@/types/user";
-import { apiClient } from "@/lib/api-client";
+import { apiClient, tokenStore } from "@/lib/api-client";
 
 interface AuthContextType {
   user: User | null;
@@ -17,10 +17,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const checkSession = useCallback(async () => {
+    // Only check session if we have a stored token
+    const token = tokenStore.get();
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
     try {
       const u = await apiClient.get<User>("/auth/me");
       setUser(u);
     } catch {
+      tokenStore.clear();
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -32,12 +39,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [checkSession]);
 
   const login = async (email: string, password: string) => {
-    const data = await apiClient.post<{ user: User }>("/auth/login", { email, password });
+    const data = await apiClient.post<{ user: User; token: string }>("/auth/login", {
+      email,
+      password,
+    });
+    // Store token so every subsequent request includes Authorization: Bearer <token>
+    tokenStore.set(data.token);
     setUser(data.user);
   };
 
   const logout = async () => {
     await apiClient.post("/auth/logout", {}).catch(() => {});
+    tokenStore.clear();
     setUser(null);
   };
 

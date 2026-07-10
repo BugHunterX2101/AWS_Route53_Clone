@@ -1,5 +1,31 @@
 const BASE_URL = "/api/v1";
 
+// Token is stored in memory (survives page navigation, cleared on tab close)
+// and also persisted to sessionStorage so refresh doesn't log user out.
+let _token: string | null = null;
+
+export const tokenStore = {
+  get: (): string | null => {
+    if (_token) return _token;
+    try {
+      _token = sessionStorage.getItem("auth_token");
+    } catch {}
+    return _token;
+  },
+  set: (token: string) => {
+    _token = token;
+    try {
+      sessionStorage.setItem("auth_token", token);
+    } catch {}
+  },
+  clear: () => {
+    _token = null;
+    try {
+      sessionStorage.removeItem("auth_token");
+    } catch {}
+  },
+};
+
 interface FetchOptions extends RequestInit {
   params?: Record<string, string | number | undefined>;
 }
@@ -19,12 +45,18 @@ async function fetchApi<T>(path: string, options: FetchOptions = {}): Promise<T>
     if (qs) url += `?${qs}`;
   }
 
+  const token = tokenStore.get();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init.headers as Record<string, string>),
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const response = await fetch(url, {
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...init.headers,
-    },
+    credentials: "include", // keep for cookie fallback
+    headers,
     ...init,
   });
 

@@ -3,13 +3,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
-import { Globe, Lock, Mail, Eye, EyeOff } from "lucide-react";
+import { Globe, Lock, Mail, Eye, EyeOff, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("admin@example.com");
   const [password, setPassword] = useState("password123");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const { login } = useAuth();
   const { error: toastError } = useToast();
   const router = useRouter();
@@ -17,11 +18,30 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setStatusMessage("Connecting to server...");
+
+    // Warm-up timeout: after 5 sec show a cold-start hint
+    const warmupTimer = setTimeout(() => {
+      setStatusMessage("Server is waking up from sleep (free tier). Please wait ~30 seconds...");
+    }, 5000);
+
     try {
       await login(email, password);
+      clearTimeout(warmupTimer);
+      setStatusMessage("Success! Redirecting...");
       router.push("/hosted-zones");
     } catch (err: unknown) {
-      toastError("Login failed", err instanceof Error ? err.message : "Invalid credentials");
+      clearTimeout(warmupTimer);
+      setStatusMessage(null);
+      const msg = err instanceof Error ? err.message : "Invalid credentials";
+      if (msg.includes("fetch") || msg.includes("network") || msg.includes("Failed")) {
+        toastError(
+          "Connection failed",
+          "The backend server is unreachable. It may be waking up — wait 30 seconds and try again."
+        );
+      } else {
+        toastError("Login failed", msg);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -66,6 +86,7 @@ export default function LoginPage() {
                     placeholder="email@example.com"
                     required
                     autoComplete="email"
+                    disabled={isLoading}
                   />
                 </div>
               </div>
@@ -82,16 +103,26 @@ export default function LoginPage() {
                     placeholder="Enter your password"
                     required
                     autoComplete="current-password"
+                    disabled={isLoading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    disabled={isLoading}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
+
+              {/* Status / cold-start message */}
+              {statusMessage && (
+                <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-700">
+                  <Loader2 className="w-3 h-3 flex-shrink-0 animate-spin" />
+                  <span>{statusMessage}</span>
+                </div>
+              )}
 
               <button
                 type="submit"
@@ -111,7 +142,10 @@ export default function LoginPage() {
               <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-700">
                 <strong>Demo credentials:</strong><br />
                 Email: admin@example.com<br />
-                Password: password123
+                Password: password123<br />
+                <span className="text-blue-500 mt-1 block">
+                  First login may take up to 30 seconds (free server wake-up)
+                </span>
               </div>
             </form>
           </div>
