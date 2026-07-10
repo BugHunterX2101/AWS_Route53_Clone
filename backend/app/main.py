@@ -79,8 +79,11 @@ app.include_router(router)
 @app.on_event("startup")
 async def startup():
     create_tables()
-    from app.seed import seed_data
-    seed_data()
+    try:
+        from app.seed import seed_data
+        seed_data()
+    except Exception as e:
+        print(f"Startup seed error: {e}")
 
 
 # ── Health check ─────────────────────────────────────────────────────────────
