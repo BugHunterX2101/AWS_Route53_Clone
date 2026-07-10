@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
+const BACKEND_URL = process.env.BACKEND_URL || "https://route53-clone-backend-1jhp.onrender.com";
 
 // Runtime proxy for all /api/v1/* requests → Render backend
 // Reading BACKEND_URL at RUNTIME (not build time) is the key difference
