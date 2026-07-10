@@ -32,6 +32,15 @@ async function proxyToBackend(
     });
 
     const responseHeaders = new Headers(backendResponse.headers);
+    
+    // fetch() automatically decompresses the response body.
+    // If we pass the original content-encoding header back to the browser, 
+    // the browser tries to decompress already-decompressed JSON and fails with ERR_CONTENT_DECODING_FAILED.
+    // We must also remove content-length since the uncompressed size differs.
+    responseHeaders.delete("content-encoding");
+    responseHeaders.delete("content-length");
+    responseHeaders.delete("transfer-encoding");
+
     // Expose Content-Disposition so file downloads work
     responseHeaders.set("Access-Control-Expose-Headers", "Content-Disposition");
 
