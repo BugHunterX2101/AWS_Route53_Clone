@@ -1,152 +1,128 @@
 # AWS Route53 Clone
 
-A fully functional, self-hosted clone of the AWS Route53 console — complete with hosted zone management, DNS record CRUD, mocked authentication, search/filter/pagination, and a pixel-perfect AWS-style UI.
+A fully functional clone of the **AWS Route53 Management Console** — built with FastAPI, Next.js 14, and Tailwind CSS.
 
-## Tech Stack
+![License](https://img.shields.io/badge/license-MIT-blue)
+![Python](https://img.shields.io/badge/python-3.12-blue)
+![Next.js](https://img.shields.io/badge/Next.js-14-black)
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 14+ (App Router, TypeScript) |
-| Styling | Tailwind CSS + shadcn/ui |
-| Server State | TanStack Query |
-| Form Validation | react-hook-form + zod |
-| Backend | FastAPI (Python 3.12+) |
-| ORM | SQLAlchemy 2.0 |
-| Database | SQLite |
-| Auth | bcrypt + HTTP-only session cookies |
+---
 
 ## Features
 
-- ✅ **Mocked Authentication** — Login/logout with session persistence
-- ✅ **Hosted Zones CRUD** — Create, view, edit, delete hosted zones with search & pagination
-- ✅ **DNS Records CRUD** — Full type-aware record management (A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, CAA)
-- ✅ **Auto NS/SOA generation** — Mirrors real Route53 behavior on zone creation
-- ✅ **System record protection** — NS/SOA at zone apex cannot be deleted
-- ✅ **Export** — Download zone as JSON or BIND zone file
-- ✅ **Route53-style UI** — Left nav, breadcrumbs, compact tables, blue actions, slide-over modals, toast notifications
-- ✅ **Coming Soon sections** — Dashboard, Traffic Policies, Resolver, Health Checks, Profiles
+- **Hosted Zone Management** — Create, update, delete public/private hosted zones
+- **DNS Records** — Full CRUD for A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, CAA records
+- **Auto NS & SOA** — System records generated on zone creation (protected from deletion)
+- **Search & Pagination** — Real-time search + type filters on all list views
+- **Export** — Download zones as JSON or BIND zone files
+- **Authentication** — HTTP-only session cookies with bcrypt password hashing
+- **AWS UI** — Pixel-perfect Cloudscape-style interface (dark nav, orange CTAs)
+- **Toast Notifications** — Success/error feedback on all mutations
+- **Route Protection** — Middleware-based auth guards on all dashboard routes
 
-## Quick Start
+---
+
+## Tech Stack
+
+| Layer     | Technology                          |
+|-----------|-------------------------------------|
+| Frontend  | Next.js 14, TypeScript, Tailwind CSS, TanStack Query |
+| Backend   | FastAPI, SQLAlchemy, Pydantic v2    |
+| Database  | SQLite (file-based, zero-config)    |
+| Auth      | bcrypt + HTTP-only session cookies  |
+
+---
+
+## Quick Start (Local)
 
 ### Prerequisites
-
-- Node.js 18+
 - Python 3.12+
-- npm or yarn
+- Node.js 20+
 
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/BugHunterX2101/AWS_Route53_Clone.git
-cd AWS_Route53_Clone
-```
-
-### 2. Backend Setup
-
+### Backend
 ```bash
 cd backend
-py -m venv venv
-venv\Scripts\activate          # Windows
-# source venv/bin/activate    # macOS/Linux
-
+py -3.12 -m venv venv
+.\venv\Scripts\activate        # Windows
+# source venv/bin/activate     # macOS/Linux
 pip install -r requirements.txt
-
-# Copy and configure environment
-copy .env.example .env
-
-# Run the server (seeds demo user automatically)
 uvicorn app.main:app --reload --port 8000
 ```
 
-Backend available at: http://localhost:8000  
-API docs: http://localhost:8000/docs
-
-### 3. Frontend Setup
-
+### Frontend
 ```bash
 cd frontend
 npm install
-
-# Copy and configure environment
-copy .env.local.example .env.local
-
 npm run dev
 ```
 
-Frontend available at: http://localhost:3000
+Open [http://localhost:3000](http://localhost:3000)
 
-### Demo Credentials
+**Demo credentials:** `admin@example.com` / `password123`
 
-| Field | Value |
-|-------|-------|
-| Email | `admin@example.com` |
-| Password | `password123` |
+---
+
+## Deploy on Render (Free)
+
+This repo includes a **`render.yaml`** Blueprint for one-click deployment.
+
+### Steps
+
+1. Go to [https://dashboard.render.com/select-repo](https://dashboard.render.com/select-repo)
+2. Connect your GitHub account and select **`BugHunterX2101/AWS_Route53_Clone`**
+3. Render detects `render.yaml` automatically — click **Apply**
+4. Two services will be created:
+   - `route53-clone-backend` (FastAPI)
+   - `route53-clone-frontend` (Next.js)
+5. Wait ~5 minutes for both to build and go live
+
+> **Note:** The free tier spins down after 15 min of inactivity. First request after sleep may take ~30 seconds.
+
+### After Deploy
+
+Once both services are live, optionally tighten CORS:
+
+1. In the Render dashboard → `route53-clone-backend` → **Environment**
+2. Set `CORS_ALLOW_ALL` → `false`
+3. Set `CORS_ORIGINS` → `["https://route53-clone-frontend.onrender.com"]`
+4. Click **Save Changes** (auto-redeploys)
+
+---
 
 ## Project Structure
 
 ```
-route53-clone/
-├── README.md
-├── .gitignore
-├── docker-compose.yml
-├── frontend/                    # Next.js TypeScript app
+AWS Route53 Clone/
+├── render.yaml               # Render Blueprint (one-click deploy)
+├── docker-compose.yml        # Local Docker stack
+├── backend/
 │   ├── app/
-│   │   ├── (auth)/login/
-│   │   └── (dashboard)/
-│   │       ├── hosted-zones/
-│   │       └── [Coming Soon pages]
-│   ├── components/
-│   │   ├── layout/              # SideNav, TopBar, Breadcrumbs
-│   │   ├── common/              # DataTable, Modal, Toast, etc.
-│   │   ├── zones/               # Zone-specific components
-│   │   └── records/             # Record-specific components
-│   └── lib/, hooks/, context/, types/
-└── backend/                     # FastAPI app
-    └── app/
-        ├── api/v1/              # Routes: auth, hosted_zones, dns_records
-        ├── core/                # Config, security, database
-        ├── models/              # SQLAlchemy ORM models
-        ├── schemas/             # Pydantic schemas
-        └── services/            # Business logic layer
+│   │   ├── api/v1/           # FastAPI route handlers
+│   │   ├── core/             # Config, DB, security
+│   │   ├── models/           # SQLAlchemy models
+│   │   ├── schemas/          # Pydantic v2 schemas
+│   │   ├── services/         # Business logic
+│   │   ├── seed.py           # Demo data seeder
+│   │   └── main.py           # App entry point
+│   └── requirements.txt
+└── frontend/
+    ├── app/                  # Next.js App Router pages
+    ├── components/           # UI components
+    ├── context/              # React contexts (auth, toast)
+    ├── lib/                  # API client, query keys
+    └── types/                # TypeScript types
 ```
 
-## API Overview
+---
 
-Base URL: `http://localhost:8000/api/v1`
+## API Documentation
 
-### Auth
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/auth/login` | Authenticate, set session cookie |
-| POST | `/auth/logout` | Invalidate session |
-| GET | `/auth/me` | Current user info |
+Once running, interactive API docs are available at:
+- **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
-### Hosted Zones
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/hosted-zones` | List zones (search + paginate) |
-| POST | `/hosted-zones` | Create zone (auto NS/SOA) |
-| GET | `/hosted-zones/{id}` | Zone detail |
-| PUT | `/hosted-zones/{id}` | Update comment |
-| DELETE | `/hosted-zones/{id}` | Delete zone + cascade |
-
-### DNS Records
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/hosted-zones/{zoneId}/records` | List/search/filter records |
-| POST | `/hosted-zones/{zoneId}/records` | Create record |
-| PUT | `/hosted-zones/{zoneId}/records/{id}` | Update record |
-| DELETE | `/hosted-zones/{zoneId}/records/{id}` | Delete record |
-| GET | `/hosted-zones/{zoneId}/export` | Export as JSON or BIND |
-
-## Database Schema
-
-```
-users (1) ────< sessions (N)
-users (1) ────< hosted_zones (N)
-hosted_zones (1) ────< dns_records (N)
-```
+---
 
 ## License
 
-MIT
+MIT — free to use, modify, and distribute.

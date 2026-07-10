@@ -1,6 +1,5 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.database import create_tables
@@ -15,19 +14,24 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS
+# ── CORS ────────────────────────────────────────────────────────────────────
+cors_origins = settings.get_cors_origins()
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.get_cors_origins(),
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # When allow_origins=["*"] credentials must be false — guard against that
+    expose_headers=["Content-Disposition"],
 )
 
-# Include all routes
+# ── Routes ───────────────────────────────────────────────────────────────────
 app.include_router(router)
 
 
+# ── Startup ──────────────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup():
     create_tables()
@@ -35,6 +39,7 @@ async def startup():
     seed_data()
 
 
+# ── Health check ─────────────────────────────────────────────────────────────
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "Route53 Clone API"}
+    return {"status": "ok", "service": "Route53 Clone API", "version": "1.0.0"}
