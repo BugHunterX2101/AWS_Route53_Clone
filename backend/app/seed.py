@@ -125,10 +125,6 @@ def seed_data():
         db.commit()
         print(f"✅ Seeded demo user: {DEMO_EMAIL} / {DEMO_PASSWORD}")
         print(f"✅ Seeded {len(SAMPLE_ZONES)} hosted zones with sample records")
-
-    except Exception as e:
-        db.rollback()
-        print(f"⚠️  Seed error (may already be seeded): {e}")
     finally:
         db.close()
 

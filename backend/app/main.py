@@ -100,11 +100,20 @@ def debug_db():
     from app.models.user import User
     import traceback
     
+    # Try seeding explicitly to catch the silent error
+    seed_error = None
+    try:
+        from app.seed import seed_data
+        seed_data()
+    except Exception as e:
+        seed_error = traceback.format_exc()
+        
     db = SessionLocal()
     try:
         users = db.query(User).all()
         return {
             "users": [{"id": u.id, "email": u.email, "hash": u.password_hash} for u in users],
+            "seed_error": seed_error
         }
     except Exception as e:
         return {"error": str(e), "traceback": traceback.format_exc()}
