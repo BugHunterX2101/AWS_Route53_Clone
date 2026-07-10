@@ -92,3 +92,21 @@ def health():
         "version": "1.0.0",
         "cors": "wildcard *.vercel.app + *.onrender.com + localhost",
     }
+
+
+@app.get("/debug-db")
+def debug_db():
+    from app.core.database import SessionLocal
+    from app.models.user import User
+    import traceback
+    
+    db = SessionLocal()
+    try:
+        users = db.query(User).all()
+        return {
+            "users": [{"id": u.id, "email": u.email, "hash": u.password_hash} for u in users],
+        }
+    except Exception as e:
+        return {"error": str(e), "traceback": traceback.format_exc()}
+    finally:
+        db.close()
