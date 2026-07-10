@@ -1,5 +1,6 @@
 services:
   # ── Backend: FastAPI ────────────────────────────────────────────
+  # Frontend is deployed on Vercel — only the backend lives here.
   - type: web
     name: route53-clone-backend
     runtime: python
@@ -16,31 +17,7 @@ services:
         value: sqlite:///./route53_clone.db
       - key: SESSION_EXPIRE_HOURS
         value: 24
+      # Custom CORS middleware now auto-allows *.vercel.app + *.onrender.com
+      # Set to false — wildcard patterns handle all allowed origins
       - key: CORS_ALLOW_ALL
-        value: true
-
-  # ── Frontend: Next.js ───────────────────────────────────────────
-  - type: web
-    name: route53-clone-frontend
-    runtime: node
-    rootDir: frontend
-    # Use npm ci for reproducible installs (respects package-lock.json exactly)
-    buildCommand: npm ci && npm run build
-    startCommand: npm start
-    plan: free
-    envVars:
-      - key: NODE_VERSION
-        value: 20.0.0
-      # Disable Next.js telemetry network calls during build
-      - key: NEXT_TELEMETRY_DISABLED
-        value: 1
-      # Cap Node heap to stay inside Render free tier 512MB RAM.
-      # ESLint + TypeScript checks are disabled in next.config.js so 460MB is safe.
-      - key: NODE_OPTIONS
-        value: --max-old-space-size=460
-      # Resolved at deploy time to https://<backend>.onrender.com
-      - key: BACKEND_URL
-        fromService:
-          name: route53-clone-backend
-          type: web
-          property: host
+        value: false

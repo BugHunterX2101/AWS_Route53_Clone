@@ -1,5 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+import re
 
 from app.core.config import settings
 from app.core.database import create_tables
@@ -14,18 +16,60 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# ── CORS ────────────────────────────────────────────────────────────────────
-cors_origins = settings.get_cors_origins()
+# ── CORS ─────────────────────────────────────────────────────────────────────
+# Allowed origin patterns (supports wildcards via regex):
+#   - Exact origins from CORS_ORIGINS env var
+#   - Any *.vercel.app domain (covers preview + production Vercel deployments)
+#   - Any *.onrender.com domain (in case services call each other)
+#   - localhost for local dev
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    # When allow_origins=["*"] credentials must be false — guard against that
-    expose_headers=["Content-Disposition"],
-)
+CORS_WILDCARD_PATTERNS = [
+    re.compile(r"https://[a-zA-Z0-9\-]+\.vercel\.app$"),
+    re.compile(r"https://[a-zA-Z0-9\-]+\.onrender\.com$"),
+    re.compile(r"http://localhost:\d+$"),
+    re.compile(r"http://127\.0\.0\.1:\d+$"),
+]
+
+
+def is_origin_allowed(origin: str) -> bool:
+    if settings.CORS_ALLOW_ALL:
+        return True
+    explicit = settings.get_cors_origins()
+    if origin in explicit:
+        return True
+    return any(p.match(origin) for p in CORS_WILDCARD_PATTERNS)
+
+
+@app.middleware("http")
+async def cors_middleware(request: Request, call_next):
+    origin = request.headers.get("origin", "")
+
+    # Handle preflight
+    if request.method == "OPTIONS" and origin:
+        if is_origin_allowed(origin):
+            return JSONResponse(
+                content="",
+                status_code=200,
+                headers={
+                    "Access-Control-Allow-Origin": origin,
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type, Authorization, Cookie",
+                    "Access-Control-Expose-Headers": "Content-Disposition",
+                    "Access-Control-Max-Age": "600",
+                },
+            )
+        return JSONResponse(content={"detail": "CORS not allowed"}, status_code=403)
+
+    response = await call_next(request)
+
+    if origin and is_origin_allowed(origin):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Expose-Headers"] = "Content-Disposition"
+
+    return response
+
 
 # ── Routes ───────────────────────────────────────────────────────────────────
 app.include_router(router)
@@ -42,4 +86,9 @@ async def startup():
 # ── Health check ─────────────────────────────────────────────────────────────
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "Route53 Clone API", "version": "1.0.0"}
+    return {
+        "status": "ok",
+        "service": "Route53 Clone API",
+        "version": "1.0.0",
+        "cors": "wildcard *.vercel.app + *.onrender.com + localhost",
+    }
