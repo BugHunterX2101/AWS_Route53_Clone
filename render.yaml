@@ -1,36 +1,35 @@
 services:
-  # --- Backend: FastAPI ---
-    - type: web
-        name: route53-clone-backend
-            runtime: python
-                rootDir: backend
-                    buildCommand: pip install -r requirements.txt
-                        startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-                            plan: free
-                                envVars:
-                                      - key: PYTHON_VERSION
-                                              value: 3.12.0
-                                                    - key: SECRET_KEY
-                                                            generateValue: true
-                                                                  - key: DATABASE_URL
-                                                                          value: sqlite:///./route53_clone.db
-                                                                                - key: SESSION_EXPIRE_HOURS
-                                                                                        value: 24
-                                                                                              # Allow all origins on initial deploy; replace with your frontend URL after deploy
-                                                                                                    - key: CORS_ALLOW_ALL
-                                                                                                            value: true
-                                                                                                            
-                                                                                                              # --- Frontend: Next.js ---
-                                                                                                                - type: web
-                                                                                                                    name: route53-clone-frontend
-                                                                                                                        runtime: node
-                                                                                                                            rootDir: frontend
-                                                                                                                                buildCommand: npm install && npm run build
-                                                                                                                                    startCommand: npm start
-                                                                                                                                        plan: free
-                                                                                                                                            envVars:
-                                                                                                                                                  - key: NODE_VERSION
-                                                                                                                                                          value: 20.0.0
-                                                                                                                                                                # Automatically resolves to http://route53-clone-backend:10000
-                                                                                                                                                                      - key: BACKEND_URL
-                                                                                                                                                                              value: http://route53-clone-backend:10000
+  - type: web
+    name: route53-clone-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        value: sqlite:///./route53_clone.db
+      - key: SESSION_EXPIRE_HOURS
+        value: 24
+      - key: CORS_ALLOW_ALL
+        value: true
+
+  - type: web
+    name: route53-clone-frontend
+    runtime: node
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    plan: free
+    envVars:
+      - key: NODE_VERSION
+        value: 20.0.0
+      - key: BACKEND_URL
+        fromService:
+          name: route53-clone-backend
+          type: web
+          property: host
