@@ -3,6 +3,9 @@ import "./globals.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/context/AuthContext";
 import { ToastProvider } from "@/context/ToastContext";
+import { ThemeProvider } from "@/context/ThemeContext";
+import { KeyboardShortcutsProvider } from "@/context/KeyboardShortcutsContext";
+import { KeyboardShortcutsHelp } from "@/components/common/KeyboardShortcutsHelp";
 import { useState } from "react";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -27,13 +30,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <ToastProvider>
-              {children}
-            </ToastProvider>
-          </AuthProvider>
-        </QueryClientProvider>
+        <ThemeProvider>
+          <KeyboardShortcutsProvider>
+            <QueryClientProvider client={queryClient}>
+              <AuthProvider>
+                <ToastProvider>
+                  {children}
+                  <KeyboardShortcutsHelp />
+                </ToastProvider>
+              </AuthProvider>
+            </QueryClientProvider>
+          </KeyboardShortcutsProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

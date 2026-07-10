@@ -28,6 +28,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Dark mode body */
+.dark body {
+  background-color: #0f1117;
+  color: #e2e8f0;
+}
+
 /* AWS Console scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -40,6 +46,12 @@ body {
   background: #c4c4c4;
   border-radius: 3px;
 }
+.dark ::-webkit-scrollbar-track {
+  background: #1e2333;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #4a5568;
+}
 
 /* AWS-style button base */
 @layer components {
@@ -51,6 +63,10 @@ body {
     @apply inline-flex items-center gap-2 px-4 py-2 rounded text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-aws-teal disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
+  .dark .btn-secondary {
+    @apply text-gray-200 bg-gray-800 border-gray-600 hover:bg-gray-700;
+  }
+
   .btn-danger {
     @apply inline-flex items-center gap-2 px-4 py-2 rounded text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed;
   }
@@ -59,24 +75,48 @@ body {
     @apply inline-flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none;
   }
 
+  .dark .btn-ghost {
+    @apply text-gray-300 hover:bg-gray-700/60;
+  }
+
   .input {
     @apply w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-aws-teal focus:border-aws-teal bg-white placeholder-gray-400 disabled:bg-gray-50 disabled:text-gray-500;
+  }
+
+  .dark .input {
+    @apply bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500 disabled:bg-gray-900;
   }
 
   .label {
     @apply block text-sm font-medium text-gray-700 mb-1;
   }
 
+  .dark .label {
+    @apply text-gray-300;
+  }
+
   .card {
     @apply bg-white rounded shadow-aws border border-gray-200;
+  }
+
+  .dark .card {
+    @apply bg-gray-900 border-gray-700 shadow-none;
   }
 
   .table-header {
     @apply text-left text-xs font-semibold text-gray-600 uppercase tracking-wider px-4 py-3 bg-gray-50 border-b border-gray-200 whitespace-nowrap;
   }
 
+  .dark .table-header {
+    @apply text-gray-400 bg-gray-800/60 border-gray-700;
+  }
+
   .table-cell {
     @apply px-4 py-3 text-sm text-gray-800 border-b border-gray-100;
+  }
+
+  .dark .table-cell {
+    @apply text-gray-200 border-gray-800;
   }
 
   .badge {
@@ -87,16 +127,32 @@ body {
     @apply badge bg-blue-100 text-blue-800;
   }
 
+  .dark .badge-public {
+    @apply bg-blue-900/40 text-blue-300;
+  }
+
   .badge-private {
     @apply badge bg-purple-100 text-purple-800;
+  }
+
+  .dark .badge-private {
+    @apply bg-purple-900/40 text-purple-300;
   }
 
   .badge-system {
     @apply badge bg-gray-100 text-gray-600;
   }
 
+  .dark .badge-system {
+    @apply bg-gray-800 text-gray-400;
+  }
+
   .badge-record {
     @apply badge bg-gray-100 text-gray-700 font-mono;
+  }
+
+  .dark .badge-record {
+    @apply bg-gray-800 text-gray-300;
   }
 
   .sidebar-item {
@@ -123,4 +179,9 @@ body {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 4px;
+}
+
+.dark .skeleton {
+  background: linear-gradient(90deg, #1e2333 25%, #252d3d 50%, #1e2333 75%);
+  background-size: 200% 100%;
 }

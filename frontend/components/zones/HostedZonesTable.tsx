@@ -1,7 +1,8 @@
 "use client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/context/ToastContext";
+import { useKeyboardShortcuts } from "@/context/KeyboardShortcutsContext";
 import { HostedZone, HostedZoneCreate, PaginatedResponse } from "@/types/hosted-zone";
 import { apiClient } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -12,7 +13,7 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import Link from "next/link";
 import {
-  Plus, Trash2, Edit2, RefreshCw, ExternalLink, Globe
+  Plus, Trash2, Edit2, RefreshCw, Globe, CheckSquare, X
 } from "lucide-react";
 
 export function HostedZonesTable() {
@@ -23,9 +24,30 @@ export function HostedZonesTable() {
   const [editZone, setEditZone] = useState<HostedZone | null>(null);
   const [deleteZone, setDeleteZone] = useState<HostedZone | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   const queryClient = useQueryClient();
   const { success, error: toastError } = useToast();
+  const { registerShortcut, unregisterShortcut } = useKeyboardShortcuts();
+
+  // Register keyboard shortcuts
+  useEffect(() => {
+    registerShortcut("zones-create", {
+      key: "n",
+      description: "Create a new hosted zone",
+      action: () => setCreateOpen(true),
+    });
+    registerShortcut("zones-refresh", {
+      key: "r",
+      description: "Refresh hosted zones list",
+      action: () => refetch(),
+    });
+    return () => {
+      unregisterShortcut("zones-create");
+      unregisterShortcut("zones-refresh");
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registerShortcut, unregisterShortcut]);
 
   const { data, isLoading, isFetching, refetch } = useQuery<PaginatedResponse<HostedZone>>({
     queryKey: queryKeys.zones.list({ search, page, pageSize }),
@@ -47,6 +69,30 @@ export function HostedZonesTable() {
     onError: (err: Error) => toastError("Delete failed", err.message),
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      // Delete zones serially (no bulk endpoint for zones)
+      let count = 0;
+      for (const id of ids) {
+        await apiClient.delete(`/hosted-zones/${id}`);
+        count++;
+      }
+      return count;
+    },
+    onSuccess: (count: number) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.zones.all() });
+      success(`Deleted ${count} hosted zone${count !== 1 ? "s" : ""}`);
+      setSelected(new Set());
+      setBulkDeleteOpen(false);
+    },
+    onError: (err: Error) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.zones.all() });
+      toastError("Bulk delete partially failed", err.message);
+      setSelected(new Set());
+      setBulkDeleteOpen(false);
+    },
+  });
+
   const zones = data?.items ?? [];
 
   const toggleSelect = (id: string) => {
@@ -65,42 +111,65 @@ export function HostedZonesTable() {
     }
   };
 
+  const someSelected = selected.size > 0;
+  const allSelected = zones.length > 0 && selected.size === zones.length;
+
   return (
     <div>
       <Breadcrumbs items={[{ label: "Hosted zones" }]} />
 
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Hosted zones</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Hosted zones</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
             Manage DNS hosted zones for your domains
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => refetch()} className="btn-secondary" disabled={isFetching}>
+          <button onClick={() => refetch()} className="btn-secondary" disabled={isFetching} title="Refresh (r)">
             <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
             Refresh
           </button>
-          <button onClick={() => setCreateOpen(true)} className="btn-primary">
+          <button onClick={() => setCreateOpen(true)} className="btn-primary" title="Create hosted zone (n)">
             <Plus className="w-4 h-4" />
             Create hosted zone
           </button>
         </div>
       </div>
 
-      <div className="card">
+      {/* Bulk action bar */}
+      {someSelected && (
+        <div className="flex items-center gap-3 px-4 py-2.5 mb-3 bg-aws-teal/10 dark:bg-aws-teal/20 border border-aws-teal/30 rounded-md animate-fade-in">
+          <CheckSquare className="w-4 h-4 text-aws-teal flex-shrink-0" />
+          <span className="text-sm font-medium text-aws-teal">
+            {selected.size} zone{selected.size !== 1 ? "s" : ""} selected
+          </span>
+          <div className="flex-1" />
+          <button
+            onClick={() => setBulkDeleteOpen(true)}
+            className="btn-danger text-xs px-3 py-1.5"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete selected
+          </button>
+          <button
+            onClick={() => setSelected(new Set())}
+            className="btn-ghost text-xs px-2 py-1.5"
+            title="Clear selection"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      <div className="card dark:bg-gray-900 dark:border-gray-700">
         {/* Toolbar */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
           <SearchBar
             placeholder="Search by domain name"
             value={search}
             onSearch={(v) => { setSearch(v); setPage(1); }}
           />
-          {selected.size > 0 && (
-            <span className="text-sm text-gray-600 ml-2">
-              {selected.size} selected
-            </span>
-          )}
         </div>
 
         {/* Table */}
@@ -108,12 +177,13 @@ export function HostedZonesTable() {
           <table className="w-full">
             <thead>
               <tr>
-                <th className="table-header w-10">
+                <th className="table-header w-10 px-3">
                   <input
                     type="checkbox"
-                    checked={zones.length > 0 && selected.size === zones.length}
+                    checked={allSelected}
                     onChange={toggleAll}
-                    className="rounded border-gray-300"
+                    className="rounded border-gray-300 text-aws-teal focus:ring-aws-teal cursor-pointer"
+                    disabled={zones.length === 0}
                   />
                 </th>
                 <th className="table-header">Domain name</th>
@@ -138,8 +208,8 @@ export function HostedZonesTable() {
                 ))
               ) : zones.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-16 text-gray-500">
-                    <Globe className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                  <td colSpan={8} className="text-center py-16 text-gray-500 dark:text-gray-400">
+                    <Globe className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
                     <p className="font-medium">No hosted zones</p>
                     <p className="text-sm mt-1">
                       {search ? `No zones matching "${search}"` : "Create your first hosted zone to get started"}
@@ -156,14 +226,16 @@ export function HostedZonesTable() {
                 zones.map((zone) => (
                   <tr
                     key={zone.id}
-                    className="hover:bg-blue-50/50 transition-colors cursor-pointer"
+                    className={`hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors cursor-pointer ${
+                      selected.has(zone.id) ? "bg-aws-teal/5 dark:bg-aws-teal/10" : ""
+                    }`}
                   >
-                    <td className="table-cell" onClick={(e) => e.stopPropagation()}>
+                    <td className="table-cell px-3" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selected.has(zone.id)}
                         onChange={() => toggleSelect(zone.id)}
-                        className="rounded border-gray-300"
+                        className="rounded border-gray-300 text-aws-teal focus:ring-aws-teal cursor-pointer"
                       />
                     </td>
                     <td className="table-cell font-medium">
@@ -179,12 +251,12 @@ export function HostedZonesTable() {
                         {zone.type.charAt(0) + zone.type.slice(1).toLowerCase()}
                       </span>
                     </td>
-                    <td className="table-cell text-gray-600">{zone.record_count}</td>
-                    <td className="table-cell text-gray-500 max-w-xs truncate">
-                      {zone.comment || <span className="text-gray-300">—</span>}
+                    <td className="table-cell text-gray-600 dark:text-gray-400">{zone.record_count}</td>
+                    <td className="table-cell text-gray-500 dark:text-gray-400 max-w-xs truncate">
+                      {zone.comment || <span className="text-gray-300 dark:text-gray-600">—</span>}
                     </td>
-                    <td className="table-cell font-mono text-xs text-gray-500">{zone.id}</td>
-                    <td className="table-cell text-gray-500 text-xs">
+                    <td className="table-cell font-mono text-xs text-gray-500 dark:text-gray-400">{zone.id}</td>
+                    <td className="table-cell text-gray-500 dark:text-gray-400 text-xs">
                       {new Date(zone.created_at).toLocaleDateString()}
                     </td>
                     <td className="table-cell">
@@ -198,7 +270,7 @@ export function HostedZonesTable() {
                         </button>
                         <button
                           onClick={() => setDeleteZone(zone)}
-                          className="btn-ghost p-1.5 text-red-500 hover:bg-red-50"
+                          className="btn-ghost p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
                           title="Delete"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -235,6 +307,7 @@ export function HostedZonesTable() {
         }}
       />
 
+      {/* Single delete */}
       <ConfirmDialog
         isOpen={!!deleteZone}
         onClose={() => setDeleteZone(null)}
@@ -242,6 +315,16 @@ export function HostedZonesTable() {
         title="Delete hosted zone"
         message={`Are you sure you want to delete "${deleteZone?.domain_name}"? This will permanently remove the zone and all its DNS records. This action cannot be undone.`}
         isLoading={deleteMutation.isPending}
+      />
+
+      {/* Bulk delete */}
+      <ConfirmDialog
+        isOpen={bulkDeleteOpen}
+        onClose={() => setBulkDeleteOpen(false)}
+        onConfirm={() => bulkDeleteMutation.mutate(Array.from(selected))}
+        title={`Delete ${selected.size} hosted zone${selected.size !== 1 ? "s" : ""}`}
+        message={`Are you sure you want to delete ${selected.size} selected hosted zone${selected.size !== 1 ? "s" : ""}? This will permanently remove all zones and their DNS records. This action cannot be undone.`}
+        isLoading={bulkDeleteMutation.isPending}
       />
     </div>
   );

@@ -1,8 +1,9 @@
 import json
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, List, Any
+from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.api.deps import get_current_user, PaginationParams
@@ -12,6 +13,7 @@ from app.schemas.dns_record import DnsRecordCreate, DnsRecordUpdate, DnsRecordRe
 from app.schemas.common import PaginatedResponse
 from app.services.record_service import RecordService
 from app.services.import_export_service import ImportExportService
+from app.services.import_service import ImportService, parse_bind
 
 router = APIRouter(prefix="/hosted-zones/{zone_id}/records", tags=["dns-records"])
 
@@ -96,3 +98,62 @@ def delete_record(
 ):
     svc = RecordService(db)
     svc.delete_record(zone_id, record_id, current_user.id)
+
+
+# ── Bulk delete ──────────────────────────────────────────────────────────────
+
+class BulkDeleteRequest(BaseModel):
+    ids: List[str]
+
+
+@router.delete("", status_code=200)
+def bulk_delete_records(
+    zone_id: str,
+    payload: BulkDeleteRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete multiple DNS records by ID in a single request."""
+    svc = ImportService(db)
+    deleted = svc.bulk_delete_records(zone_id, payload.ids, current_user.id)
+    return {"deleted": deleted}
+
+
+# ── Import ───────────────────────────────────────────────────────────────────
+
+class ImportBindRequest(BaseModel):
+    bind_text: str
+    origin: Optional[str] = ""
+    skip_existing: bool = True
+
+
+class ImportJsonRequest(BaseModel):
+    records: List[Any]
+    skip_existing: bool = True
+
+
+@router.post("/import/bind", status_code=200)
+def import_bind(
+    zone_id: str,
+    payload: ImportBindRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Import DNS records from a BIND zone file text."""
+    records = parse_bind(payload.bind_text, payload.origin or "")
+    svc = ImportService(db)
+    created, skipped = svc.import_records(zone_id, records, current_user.id, payload.skip_existing)
+    return {"created": created, "skipped": skipped, "total": len(records)}
+
+
+@router.post("/import/json", status_code=200)
+def import_json(
+    zone_id: str,
+    payload: ImportJsonRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Import DNS records from a JSON array."""
+    svc = ImportService(db)
+    created, skipped = svc.import_records(zone_id, payload.records, current_user.id, payload.skip_existing)
+    return {"created": created, "skipped": skipped, "total": len(payload.records)}

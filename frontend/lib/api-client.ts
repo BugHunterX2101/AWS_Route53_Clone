@@ -82,6 +82,9 @@ export const apiClient = {
   put: <T>(path: string, body: unknown) =>
     fetchApi<T>(path, { method: "PUT", body: JSON.stringify(body) }),
 
-  delete: (path: string) =>
-    fetchApi<void>(path, { method: "DELETE" }),
+  delete: <T = void>(path: string, body?: unknown) =>
+    fetchApi<T>(path, {
+      method: "DELETE",
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    }),
 };
