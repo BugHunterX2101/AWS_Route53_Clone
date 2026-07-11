@@ -143,7 +143,7 @@ export function RecordsTable({ zone }: RecordsTableProps) {
         return next;
       });
     } else {
-      setSelectedIds((prev) => new Set([...prev, ...selectableIds]));
+      setSelectedIds((prev) => new Set([...Array.from(prev), ...selectableIds]));
     }
   };
 

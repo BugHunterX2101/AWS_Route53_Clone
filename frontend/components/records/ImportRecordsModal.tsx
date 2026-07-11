@@ -41,12 +41,12 @@ export function ImportRecordsModal({
   const queryClient = useQueryClient();
   const { success, error: toastError } = useToast();
 
-  const importMutation = useMutation({
-    mutationFn: async () => {
+  const importMutation = useMutation<ImportResult, Error, void>({
+    mutationFn: async (): Promise<ImportResult> => {
       setParseError(null);
       if (tab === "bind") {
         if (!bindText.trim()) throw new Error("Please enter or upload a BIND zone file");
-        return apiClient.post(`/hosted-zones/${zoneId}/records/import/bind`, {
+        return apiClient.post<ImportResult>(`/hosted-zones/${zoneId}/records/import/bind`, {
           bind_text: bindText,
           origin: zoneDomain,
           skip_existing: skipExisting,
@@ -60,7 +60,7 @@ export function ImportRecordsModal({
         } catch (e) {
           throw new Error(`Invalid JSON: ${(e as Error).message}`);
         }
-        return apiClient.post(`/hosted-zones/${zoneId}/records/import/json`, {
+        return apiClient.post<ImportResult>(`/hosted-zones/${zoneId}/records/import/json`, {
           records,
           skip_existing: skipExisting,
         });
