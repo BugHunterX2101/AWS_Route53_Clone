@@ -1,11 +1,24 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from contextlib import asynccontextmanager
 import re
 
 from app.core.config import settings
 from app.core.database import create_tables
 from app.api.v1.router import router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan: create tables and seed on startup."""
+    create_tables()
+    try:
+        from app.seed import seed_data
+        seed_data()
+    except Exception as e:
+        print(f"Startup seed error: {e}")
+    yield  # Application runs here
 
 
 app = FastAPI(
@@ -14,6 +27,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # ── CORS ─────────────────────────────────────────────────────────────────────
@@ -75,15 +89,6 @@ async def cors_middleware(request: Request, call_next):
 app.include_router(router)
 
 
-# ── Startup ──────────────────────────────────────────────────────────────────
-@app.on_event("startup")
-async def startup():
-    create_tables()
-    try:
-        from app.seed import seed_data
-        seed_data()
-    except Exception as e:
-        print(f"Startup seed error: {e}")
 
 
 # ── Health check ─────────────────────────────────────────────────────────────
@@ -101,22 +106,17 @@ def health():
 def debug_db():
     from app.core.database import SessionLocal
     from app.models.user import User
+    from app.models.hosted_zone import HostedZone
     import traceback
-    
-    # Try seeding explicitly to catch the silent error
-    seed_error = None
-    try:
-        from app.seed import seed_data
-        seed_data()
-    except Exception as e:
-        seed_error = traceback.format_exc()
-        
+
     db = SessionLocal()
     try:
         users = db.query(User).all()
+        zones = db.query(HostedZone).all()
         return {
-            "users": [{"id": u.id, "email": u.email, "hash": u.password_hash} for u in users],
-            "seed_error": seed_error
+            "users": [{"id": u.id, "email": u.email, "name": u.name} for u in users],
+            "zone_count": len(zones),
+            "zones": [{"id": z.id, "domain": z.domain_name, "records": z.record_count} for z in zones],
         }
     except Exception as e:
         return {"error": str(e), "traceback": traceback.format_exc()}

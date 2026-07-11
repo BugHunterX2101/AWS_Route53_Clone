@@ -296,6 +296,7 @@ export function HostedZonesTable() {
 
       {/* Modals */}
       <ZoneFormModal
+        key={editZone?.id ?? (createOpen ? "create" : "closed")}
         isOpen={createOpen || !!editZone}
         mode={editZone ? "edit" : "create"}
         initialData={editZone || undefined}

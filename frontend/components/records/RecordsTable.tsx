@@ -353,6 +353,7 @@ export function RecordsTable({ zone }: RecordsTableProps) {
 
       {/* Create / Edit modal */}
       <RecordFormModal
+        key={editRecord?.id ?? (createOpen ? "create" : "closed")}
         zoneId={zone.id}
         zoneDomain={zone.domain_name}
         mode={createOpen ? "create" : "edit"}

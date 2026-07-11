@@ -187,7 +187,9 @@ class ImportService:
             ))
             created += 1
 
-        zone.record_count = self.db.query(DnsRecord).filter_by(hosted_zone_id=zone_id).count() + created
+        # Commit first, then recount — avoids SQLAlchemy flush vs commit timing bugs
+        self.db.commit()
+        zone.record_count = self.db.query(DnsRecord).filter_by(hosted_zone_id=zone_id).count()
         self.db.commit()
         return created, skipped
 
@@ -209,7 +211,9 @@ class ImportService:
                 self.db.delete(record)
                 deleted += 1
 
-        count = self.db.query(DnsRecord).filter_by(hosted_zone_id=zone_id).count()
-        zone.record_count = max(0, count - deleted)
+        # Commit first, then recount — so the count reflects actual state
+        self.db.commit()
+        zone.record_count = self.db.query(DnsRecord).filter_by(hosted_zone_id=zone_id).count()
         self.db.commit()
         return deleted
+
