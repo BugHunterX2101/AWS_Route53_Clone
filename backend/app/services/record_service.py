@@ -51,14 +51,16 @@ class RecordService:
             id=str(uuid.uuid4()),
             hosted_zone_id=zone_id,
             name=payload.name,
-            type=payload.type.value,
+            type=payload.type,
             ttl=payload.ttl,
             values=json.dumps(payload.values),
-            routing_policy=payload.routing_policy.value,
+            routing_policy=payload.routing_policy,
             is_system=False,
         )
         self.db.add(record)
-        zone.record_count = self.db.query(DnsRecord).filter_by(hosted_zone_id=zone_id).count() + 1
+        # Commit first, then recount to avoid SQLAlchemy flush double-counting
+        self.db.commit()
+        zone.record_count = self.db.query(DnsRecord).filter_by(hosted_zone_id=zone_id).count()
         self.db.commit()
         self.db.refresh(record)
         return record
@@ -72,7 +74,7 @@ class RecordService:
         if payload.values is not None:
             record.values = json.dumps(payload.values)
         if payload.routing_policy is not None:
-            record.routing_policy = payload.routing_policy.value
+            record.routing_policy = payload.routing_policy
         record.updated_at = datetime.now(timezone.utc)
         self.db.commit()
         self.db.refresh(record)

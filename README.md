@@ -3,7 +3,7 @@
 <img src="https://img.shields.io/badge/AWS-Route53%20Clone-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white" alt="AWS Route53 Clone" />
 
 <h1>AWS Route53 Clone</h1>
-<p><strong>A production-grade, pixel-perfect clone of the AWS Route53 Management Console</strong></p>
+<p><strong>A production-grade, highly-accurate clone of the AWS Route53 Management Console</strong></p>
 <p>Built with FastAPI · Next.js 14 · TypeScript · SQLite · Tailwind CSS</p>
 
 <br/>
@@ -24,52 +24,99 @@
 
 ---
 
-## What Is This?
+## Executive Summary
 
-This is a **fully functional DNS management console** that replicates the AWS Route53 experience end-to-end — from the dark navy topbar down to the orange CTAs. It goes far beyond a toy CRUD app:
+This project delivers a **fully functional DNS management console** that rigorously replicates the AWS Route53 experience. It is designed as a complete full-stack application, prioritizing architectural best practices, performance, and UI/UX fidelity.
 
-- **Real backend** — FastAPI with session-based auth, SQLAlchemy ORM, and a production-ready layered service architecture
-- **Real frontend** — Next.js App Router, TanStack Query for server-state, Cloudscape-inspired design system
-- **Real features** — BIND import/export, dark mode, keyboard shortcuts, bulk operations
-- **Real deployment** — Vercel (frontend) + Render (backend) with a runtime proxy to fix cross-domain auth
+- **Robust Backend**: Powered by FastAPI, featuring session-based authentication, SQLAlchemy ORM, and a scalable layered service architecture.
+- **Modern Frontend**: Built on the Next.js 14 App Router, utilizing TanStack Query for efficient server-state management and a bespoke Cloudscape-inspired design system.
+- **Comprehensive Features**: Supports complex operations including BIND zone file import/export, dark mode toggling, advanced keyboard shortcuts, and bulk record manipulation.
+- **Production Deployment**: Frontend hosted on Vercel, backend hosted on Render, seamlessly integrated via a runtime proxy to mitigate cross-domain authentication constraints.
 
-**Demo:** `admin@example.com` / `password123` — try it at [aws-route53-clone-three.vercel.app](https://aws-route53-clone-three.vercel.app)
+**Live Demonstration:** `admin@example.com` / `password123` — Accessible at [aws-route53-clone-three.vercel.app](https://aws-route53-clone-three.vercel.app)
 
 ---
 
 ## System Architecture
 
+### High-Level Topology
+
 ```mermaid
 graph TD
-    Browser["Browser"]
+    Browser["Browser Client"]
 
-    subgraph Vercel ["Vercel — Next.js 14 App Router"]
-        Pages["React Pages\n/login\n/hosted-zones\n/hosted-zones/[id]"]
-        Proxy["/api/v1/[...path]\nRuntime Proxy Route\nStrips content-encoding\nForwards Bearer token"]
+    subgraph Vercel ["Vercel: Next.js 14 App Router"]
+        Pages["React Server & Client Pages\n(/login, /hosted-zones, ...)"]
+        Proxy["Runtime Proxy Route\n(/api/v1/[...path])\nManages cross-domain headers"]
     end
 
-    subgraph Render ["Render — FastAPI Backend"]
-        Auth["Auth Router\nPOST /auth/login\nPOST /auth/logout\nGET  /auth/me"]
-        Zones["Hosted Zones Router\nGET / POST / PUT / DELETE\n/hosted-zones"]
-        Records["DNS Records Router\nGET / POST / PUT / DELETE\n/hosted-zones/{id}/records\n/records/import/bind\n/records/import/json"]
-        Services["Service Layer\nAuthService\nRecordService\nImportService\nImportExportService"]
-        DB["SQLite Database\nUsers · Sessions\nHostedZones · DnsRecords"]
+    subgraph Render ["Render: FastAPI Backend"]
+        Auth["Auth Router\n(POST /auth/login, GET /auth/me)"]
+        Zones["Hosted Zones Router\n(CRUD /hosted-zones)"]
+        Records["DNS Records Router\n(CRUD /records, /import/bind)"]
+        Services["Service Layer\n(Business Logic & Validation)"]
+        DB["SQLite Database\n(Persistent Storage)"]
     end
 
-    Browser --> Pages
-    Browser --> Proxy
-    Proxy -->|"HTTPS"| Auth
-    Proxy -->|"HTTPS"| Zones
-    Proxy -->|"HTTPS"| Records
+    Browser -->|Renders UI| Pages
+    Browser -->|API Requests| Proxy
+    Proxy -->|"HTTPS Forwarding"| Auth
+    Proxy -->|"HTTPS Forwarding"| Zones
+    Proxy -->|"HTTPS Forwarding"| Records
     Auth --> Services
     Zones --> Services
     Records --> Services
     Services --> DB
 ```
 
----
+### Database Schema (ERD)
 
-## Request Flow — Authentication
+```mermaid
+erDiagram
+    USERS {
+        int id PK
+        string email UK
+        string hashed_password
+        datetime created_at
+    }
+    
+    SESSIONS {
+        string token PK
+        int user_id FK
+        datetime created_at
+        datetime expires_at
+    }
+    
+    HOSTED_ZONES {
+        string id PK
+        int owner_id FK
+        string domain_name UK
+        string type "PUBLIC | PRIVATE"
+        string description
+        int record_count
+        datetime created_at
+        datetime updated_at
+    }
+    
+    DNS_RECORDS {
+        string id PK
+        string hosted_zone_id FK
+        string name
+        string type "A, AAAA, CNAME, etc."
+        int ttl
+        string values "JSON encoded"
+        string routing_policy
+        boolean is_system
+        datetime created_at
+        datetime updated_at
+    }
+
+    USERS ||--o{ SESSIONS : "authenticates via"
+    USERS ||--o{ HOSTED_ZONES : "owns"
+    HOSTED_ZONES ||--o{ DNS_RECORDS : "contains"
+```
+
+### Request Flow: Authentication
 
 ```mermaid
 sequenceDiagram
@@ -79,118 +126,106 @@ sequenceDiagram
     participant DB as SQLite
 
     B->>V: POST /api/v1/auth/login {email, password}
-    V->>R: POST /api/v1/auth/login (forwarded)
+    V->>R: Forward POST /api/v1/auth/login
     R->>DB: Query user by email
-    DB-->>R: User row
+    DB-->>R: User data
     R->>DB: INSERT session token
-    R-->>V: 200 {user, token}
-    V-->>B: 200 {user, token}
-    Note over B: Stores token in sessionStorage
-    B->>V: GET /api/v1/hosted-zones\nAuthorization: Bearer <token>
-    V->>R: GET /api/v1/hosted-zones\nAuthorization: Bearer <token>
+    R-->>V: 200 OK {user, token}
+    V-->>B: 200 OK {user, token}
+    Note over B: Persist token to sessionStorage
+    B->>V: GET /api/v1/hosted-zones (Authorization: Bearer <token>)
+    V->>R: Forward GET /api/v1/hosted-zones
     R->>DB: Validate session token
-    DB-->>R: Session + User
-    R-->>V: 200 {items, total, ...}
-    V-->>B: 200 {items, total, ...}
+    DB-->>R: Authorized Session
+    R-->>V: 200 OK {items, total}
+    V-->>B: 200 OK {items, total}
 ```
 
 ---
 
-## Feature Highlights
+## Core Capabilities
 
 ### Hosted Zone Management
 
 | Feature | Details |
 |---|---|
-| Create / Edit / Delete | Full lifecycle management for public and private zones |
-| Auto NS and SOA records | System records auto-generated on creation, protected from deletion |
-| Search and Pagination | Real-time domain-name search with configurable page size |
-| Multi-select Bulk Delete | Select multiple zones and delete in one action |
-| Keyboard shortcut | `n` to create a new zone, `r` to refresh |
+| Lifecycle Management | Complete Create, Read, Update, and Delete (CRUD) operations for Public and Private zones. |
+| System Record Generation | Automatic provisioning of foundational Name Server (NS) and Start of Authority (SOA) records. |
+| Search & Pagination | Real-time domain name filtering with dynamic page sizing. |
+| Bulk Operations | Multi-select interface for executing deletion across multiple zones simultaneously. |
+| Navigation Shortcuts | Press `n` to instantiate a new zone; press `r` to refresh the table state. |
 
 ### DNS Record Management
 
 | Feature | Details |
 |---|---|
-| Record types | A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, CAA |
-| Full CRUD | Create, view, edit, and delete any record |
-| Type filter | Filter records by type with a single click |
-| Import | Upload BIND zone files or paste JSON arrays |
-| Export | Download as JSON or BIND-compatible zone file |
-| Bulk delete | Multi-select and delete records in one click |
-| Keyboard shortcuts | `c` to create, `i` to import, `r` to refresh |
+| Supported Record Types | A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, CAA. |
+| Complete CRUD | Full lifecycle management across all record types with granular validation. |
+| Dynamic Filtering | One-click filtering by record type. |
+| Import / Export Engine | Upload standard BIND zone files or JSON. Export configurations seamlessly. |
+| Bulk Actions | Efficient multi-record deletion interface. |
+| Interactive Shortcuts | Press `c` to create, `i` to import, and `r` to refresh records. |
 
-### Authentication
+### Security & Authentication
 
-- Session-based auth with `bcrypt` password hashing (pinned to 3.2.2 for passlib compatibility)
-- Bearer token forwarded through the Next.js proxy (solves cross-domain Vercel to Render auth)
-- Client-side auth guard with automatic redirect to `/login`
-- Session persistence via `sessionStorage`
+- **Session Management**: Secure, stateful sessions utilizing `bcrypt` for password hashing (strictly pinned to version 3.2.2 for `passlib` compatibility).
+- **Proxy Architecture**: Bearer tokens are transparently forwarded through the Next.js API proxy to resolve cross-origin resource sharing (CORS) and cross-domain authentication limitations.
+- **Client-Side Protection**: Robust authentication guards automatically redirect unauthenticated traffic to the `/login` portal.
 
-### Dark Mode
+### User Interface & Experience
 
-- Toggle between light and dark with the button in the topbar
-- Preference persisted to `localStorage`
-- Full dark-mode CSS coverage for every component
-
-### Keyboard Shortcuts
-
-| Key | Action |
-|---|---|
-| `?` | Open shortcuts help panel |
-| `n` | New hosted zone |
-| `c` | New DNS record |
-| `i` | Import DNS records |
-| `r` | Refresh current table |
-| `Esc` | Close any open modal |
-
-Shortcuts are automatically disabled while typing in an input field or when any modal is open.
+- **Persistent Dark Mode**: Seamless toggle between light and dark themes, with preferences persisted locally.
+- **Accessibility & Shortcuts**: Global keyboard shortcuts (accessible via `?`) empower power-users to navigate and execute actions rapidly. Shortcuts are intelligently disabled during input focus.
+- **Design Language**: Pixel-perfect adherence to the AWS Cloudscape design system, ensuring a familiar and professional environment.
 
 ---
 
-## Tech Stack
+## Technology Stack
 
-| Layer | Technology | Purpose |
+| Domain | Technology | Implementation Details |
 |---|---|---|
-| Frontend | Next.js 14 App Router | Pages, routing, server components |
-| Styling | Tailwind CSS + custom CSS | Cloudscape-inspired AWS design system |
-| State | TanStack Query v5 | Server-state caching and mutations |
-| Backend | FastAPI + Uvicorn | REST API with async routing |
-| ORM | SQLAlchemy 2 + Pydantic v2 | Models, validation, serialization |
-| Database | SQLite | Zero-config persistent storage |
-| Auth | bcrypt + Bearer tokens | Password hashing + cross-domain sessions |
-| Deployment | Vercel + Render | Frontend CDN + backend hosting |
+| **Frontend Framework** | Next.js 14 App Router | Handles server-side rendering, routing, and React Server Components. |
+| **Styling** | Tailwind CSS | Custom utility classes tailored to replicate AWS design tokens. |
+| **State Management** | TanStack Query v5 | Advanced server-state caching, automatic refetching, and mutation handling. |
+| **Backend Framework** | FastAPI + Uvicorn | High-performance, asynchronous RESTful API architecture. |
+| **Data Access Layer** | SQLAlchemy 2 + Pydantic v2 | Object-relational mapping paired with strict data validation. |
+| **Database** | SQLite | Lightweight, persistent relational storage. |
+| **Security** | bcrypt | Industry-standard password hashing and secure token generation. |
+| **Infrastructure** | Vercel & Render | Distributed hosting for frontend and backend respectively. |
 
 ---
 
-## Quick Start (Local)
+## Local Development Guide
 
-### Prerequisites
+### System Requirements
 
-- Python 3.12+
-- Node.js 20+
+- Python 3.12 or higher
+- Node.js 20 or higher
 
-### 1. Clone the repo
+### 1. Repository Initialization
 
 ```bash
 git clone https://github.com/BugHunterX2101/AWS_Route53_Clone.git
 cd AWS_Route53_Clone
 ```
 
-### 2. Start the backend
+### 2. Backend Environment Setup
 
 ```bash
 cd backend
 python -m venv venv
-.\venv\Scripts\activate        # Windows
-# source venv/bin/activate     # macOS/Linux
+
+# Windows
+.\venv\Scripts\activate
+# macOS / Linux
+# source venv/bin/activate
+
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
+*Note: The backend automatically seeds a demonstration user and sample zones upon initial execution.*
 
-The backend seeds a demo user and sample zones automatically on first launch.
-
-### 3. Start the frontend
+### 3. Frontend Environment Setup
 
 ```bash
 cd frontend
@@ -198,111 +233,107 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and sign in with `admin@example.com` / `password123`
+Navigate to [http://localhost:3000](http://localhost:3000) and authenticate using `admin@example.com` / `password123`.
 
-### 4. API Documentation
+### 4. API Documentation Access
 
 - **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
 - **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
 ---
 
-## Deploy Your Own (Free)
+## Deployment Configuration
 
-### Frontend — Vercel
+### Frontend Deployment (Vercel)
 
-1. Import the repo at [vercel.com/new](https://vercel.com/new)
-2. Set **Root Directory** to `frontend`
-3. Add environment variable: `BACKEND_URL=https://your-render-backend.onrender.com`
-4. Deploy
+1. Import the repository via [vercel.com/new](https://vercel.com/new).
+2. Configure the **Root Directory** to `frontend`.
+3. Inject the required environment variable: `BACKEND_URL=https://<your-render-instance>.onrender.com`.
+4. Execute deployment.
 
-### Backend — Render
+### Backend Deployment (Render)
 
-1. Go to [render.com](https://render.com) and create a **New Web Service**
-2. Connect `BugHunterX2101/AWS_Route53_Clone`
-3. Set **Root Directory** to `backend`
-4. Build command: `pip install -r requirements.txt`
-5. Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-6. Add environment variable: `DATABASE_URL=sqlite:///./route53_clone.db`
+1. Navigate to [render.com](https://render.com) and provision a **New Web Service**.
+2. Connect the repository `BugHunterX2101/AWS_Route53_Clone`.
+3. Configure the **Root Directory** to `backend`.
+4. **Build Command**: `pip install -r requirements.txt`
+5. **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+6. Inject the required environment variable: `DATABASE_URL=sqlite:///./route53_clone.db`
 
-> **Note:** Render free tier spins down after 15 minutes of inactivity. The first request after sleep takes up to 30 seconds — the login page displays a "Server waking up..." message automatically.
+> **Architectural Note:** Render's free tier automatically suspends the instance after 15 minutes of inactivity. Initial requests post-suspension may require up to 30 seconds for the container to initialize. The frontend login interface programmatically detects this and displays a "Server waking up..." status to manage user expectations.
 
 ---
 
-## Project Structure
+## Project Directory Structure
 
-```
+```text
 AWS Route53 Clone/
-├── render.yaml                         # Render Blueprint
+├── render.yaml                         # Infrastructure as Code (Render Blueprint)
 ├── backend/
 │   ├── requirements.txt
 │   └── app/
-│       ├── main.py                     # FastAPI app entry point + CORS middleware
-│       ├── seed.py                     # Demo user and sample data seeder
+│       ├── main.py                     # FastAPI application root & middleware configuration
+│       ├── seed.py                     # Database initialization and seeding logic
 │       ├── api/
-│       │   ├── deps.py                 # Auth dependency (Bearer token validation)
+│       │   ├── deps.py                 # Dependency injection (e.g., Bearer token validation)
 │       │   └── v1/
-│       │       ├── auth.py             # Login / logout / me
-│       │       ├── hosted_zones.py     # Zone CRUD
-│       │       └── dns_records.py      # Record CRUD + import endpoints + bulk DELETE
+│       │       ├── auth.py             # Authentication endpoints
+│       │       ├── hosted_zones.py     # Hosted Zone management endpoints
+│       │       └── dns_records.py      # DNS Record management & import/export endpoints
 │       ├── core/
-│       │   ├── config.py               # Settings via Pydantic BaseSettings
-│       │   ├── database.py             # SQLAlchemy engine + session factory
-│       │   └── security.py             # bcrypt hashing + session token generation
-│       ├── models/                     # SQLAlchemy ORM models
-│       ├── schemas/                    # Pydantic v2 request/response schemas
-│       └── services/
+│       │   ├── config.py               # Environment configuration via Pydantic BaseSettings
+│       │   ├── database.py             # SQLAlchemy engine configuration
+│       │   └── security.py             # Cryptography and session generation utilities
+│       ├── models/                     # SQLAlchemy declarative models
+│       ├── schemas/                    # Pydantic v2 schemas for I/O validation
+│       └── services/                   # Business logic layer
 │           ├── auth_service.py
 │           ├── record_service.py
-│           ├── import_service.py       # BIND zone file parser
+│           ├── import_service.py
 │           └── import_export_service.py
 └── frontend/
     ├── app/
-    │   ├── layout.tsx                  # Root layout + all context providers
-    │   ├── globals.css                 # Design system tokens + dark mode overrides
-    │   ├── (auth)/login/               # Login page
-    │   ├── (dashboard)/                # Protected dashboard pages
-    │   └── api/v1/[...path]/           # Runtime proxy route to Render backend
+    │   ├── layout.tsx                  # Root Next.js layout & context providers
+    │   ├── globals.css                 # Global stylesheets & dark mode tokens
+    │   ├── (auth)/login/               # Authentication views
+    │   ├── (dashboard)/                # Protected application views
+    │   └── api/v1/[...path]/           # Serverless proxy route to the backend
     ├── components/
-    │   ├── layout/                     # TopBar, SideNav, Breadcrumbs
-    │   ├── zones/                      # HostedZonesTable, ZoneFormModal, ZoneHeader
-    │   ├── records/                    # RecordsTable, RecordFormModal, ImportRecordsModal
-    │   └── common/                     # Modal, ConfirmDialog, Pagination, SearchBar, KeyboardShortcutsHelp
-    ├── context/
-    │   ├── AuthContext.tsx
-    │   ├── ThemeContext.tsx             # Dark / light mode with localStorage persistence
-    │   ├── ToastContext.tsx
-    │   └── KeyboardShortcutsContext.tsx
+    │   ├── layout/                     # Structural components (TopBar, SideNav)
+    │   ├── zones/                      # Zone-specific interfaces
+    │   ├── records/                    # Record-specific interfaces & Modals
+    │   └── common/                     # Reusable UI primitives (Modals, Pagination)
+    ├── context/                        # React Context providers (Auth, Theme, Toast)
     ├── lib/
-    │   ├── api-client.ts               # Typed fetch wrapper + Bearer token injection
-    │   └── query-keys.ts
-    └── types/                          # TypeScript interfaces
+    │   ├── api-client.ts               # Type-safe fetch wrapper with interceptor logic
+    │   └── query-keys.ts               # TanStack Query cache key definitions
+    └── types/                          # Global TypeScript definitions
 ```
 
 ---
 
-## Contributing
+## Contribution Guidelines
 
-Pull requests are welcome. If you find a bug or want to add a feature:
+Contributions are encouraged to improve the architecture or expand the feature set. 
 
-1. Fork the repo
-2. Create a feature branch: `git checkout -b feat/my-feature`
-3. Commit your changes: `git commit -m "feat: add my feature"`
-4. Push and open a pull request
+1. Fork the repository.
+2. Branch off for your feature: `git checkout -b feat/your-feature-name`.
+3. Commit your changes utilizing conventional commits: `git commit -m "feat: implement your feature"`.
+4. Push to your fork and submit a Pull Request.
 
 ---
 
-## License
+## Licensing
 
-MIT — free to use, modify, and distribute.
+Distributed under the MIT License. Free for commercial and non-commercial utilization.
 
 ---
 
 <div align="center">
-  <p>Built as a full-stack engineering showcase</p>
+  <p>Engineered as a comprehensive full-stack technical showcase.</p>
   <p>
-    <a href="https://aws-route53-clone-three.vercel.app">Live Demo</a> &nbsp;·&nbsp;
-    <a href="https://route53-clone-backend-1jhp.onrender.com/docs">API Docs</a> &nbsp;·&nbsp;
-    <a href="https://github.com/BugHunterX2101/AWS_Route53_Clone/issues">Report Bug</a>
+    <a href="https://aws-route53-clone-three.vercel.app">Live Demonstration</a> &nbsp;·&nbsp;
+    <a href="https://route53-clone-backend-1jhp.onrender.com/docs">API Documentation</a> &nbsp;·&nbsp;
+    <a href="https://github.com/BugHunterX2101/AWS_Route53_Clone/issues">Report an Issue</a>
   </p>
 </div>
